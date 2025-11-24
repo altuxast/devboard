@@ -4,7 +4,8 @@ const {
     createCard,
     getCards,
     updateCard,
-    deleteCard
+    deleteCard,
+    moveCard
 } = require('../controllers/cardController');
 const authMiddleware = require('../middleware/auth');
 
@@ -13,5 +14,7 @@ router.post('/', createCard);
 router.get('/:listId', getCards);
 router.put('/:id', updateCard);
 router.delete('/:id', deleteCard);
+
+router.patch('/:id/move', moveCard);
 
 module.exports = router;
