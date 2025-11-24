@@ -87,3 +87,27 @@ exports.deleteBoard = async (req, res) => {
         handleServerError(res, 'Failed to delete board', err);
     }
 };
+
+exports.reorderLists = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { listOrder } = req.body;
+
+        if (!Array.isArray(listOrder)) {
+            return res.status(400).json({ error: 'listOrder must be an array' });
+        }
+
+        const board = await Board.findOneAndUpdate(
+            { _id: id, userId: req.user },
+            { listOrder },
+            { new: true }
+        );
+
+        if (!board) return res.status(404).json({ error: 'Board not found' });
+
+        res.json(board);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to reorder lists' });
+    }
+};

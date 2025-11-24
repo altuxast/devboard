@@ -1,6 +1,7 @@
 const List = require('../models/List');
 const Board = require('../models/Board');
 const Card = require('../models/Card');
+const mongoose = require('mongoose');
 const { handleNotFound, handleServerError } = require('../utils/responseHelpers');
 
 exports.createList = async (req, res) => {
@@ -60,7 +61,7 @@ exports.updateList = async (req, res) => {
 
 exports.deleteList = async (req, res) => {
     try {
-        const deleted = await List.findOneAndDelete({_id: req.params.id, userId: req.user});
+        const deleted = await List.findOneAndDelete({ _id: req.params.id, userId: req.user });
 
         if (handleNotFound(deleted, res, 'List')) return;
 
@@ -74,5 +75,44 @@ exports.deleteList = async (req, res) => {
         res.json({ message: 'List deleted' });
     } catch (err) {
         handleServerError(res, 'Failed to delete list', err);
+    }
+};
+
+exports.reorderCards = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const {listId} = req.params;
+        const {cardOrder} = req.body;
+
+        if(!Array.isArray(cardOrder)){
+            throw new Error("cardOrder must be an array");
+        }
+
+        if(new Set(cardOrder).size !== cardOrder.length){
+            throw new Error("Duplicate card IDs detected in cardOrder");
+        }
+
+        const list = await List.findOne({_id: listId, userId: req.user}).session(session);
+        if (!list) throw new Error("List not found");
+
+        const cards = await Card.find({_id: {$in: cardOrder}, userId: req.user}).session(session);
+
+        if(cards.length !== cardOrder.length){
+            throw new Error("Some cards do not belong to this list");
+        }
+
+        list.cardOrder = cardOrder;
+        await list.save({session});
+
+        await session.commitTransaction();
+        res.json({message: "List reordered", list});
+
+    } catch (err) {
+        await session.abortTransaction();
+        handleServerError(res, "Failed to reorder cards", err);
+    } finally {
+        session.endSession();
     }
 };

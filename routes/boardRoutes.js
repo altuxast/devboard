@@ -6,7 +6,8 @@ const{
     getBoards,
     getBoard,
     updateBoard,
-    deleteBoard
+    deleteBoard,
+    reorderLists
 } = require('../controllers/boardController');
 
 router.use(authMiddleware);
@@ -15,5 +16,8 @@ router.get('/', getBoards);
 router.get('/:id', getBoard);
 router.put('/:id', updateBoard);
 router.delete('/:id', deleteBoard);
+
+// PATCH /boards/:id/reorder-lists
+router.patch('/:id/reorder-lists', reorderLists);
 
 module.exports = router;
