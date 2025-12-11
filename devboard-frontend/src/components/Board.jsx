@@ -191,6 +191,50 @@ const Board = ({ boardId }) => {
 
     };
 
+    const handleDeleteCard = async (cardId) => {
+        const token = sessionStorage.getItem("authToken");
+
+        const snapshot = {
+            lists: JSON.parse(JSON.stringify(lists)),
+            cards: JSON.parse(JSON.stringify(cards))
+        };
+
+        try {
+
+            const res = await api.delete(`/cards/${cardId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (!res || res.status >= 400) {
+                console.error("Failed to delete card");
+                return;
+            }
+
+            // Local optimistic state update
+            setLists(prev => {
+                const next = { ...prev };
+                for (const listId in next) {
+                    next[listId] = {
+                        ...next[listId],
+                        cardOrder: (next[listId].cardOrder || []).filter(id => String(id) !== String(cardId))
+                    }
+                }
+                return next;
+            });
+
+            setCards(prev => {
+                const next = { ...prev };
+                delete next[cardId];
+                return next;
+            });
+
+        } catch (err) {
+            console.error("Delete card error", err);
+            setLists(snapshot.lists);
+            setCards(snapshot.cards);
+        }
+    }
+
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <div key={renderKey}>
@@ -214,6 +258,7 @@ const Board = ({ boardId }) => {
                                         list={listObj}
                                         cardsById={cards}   // ensure List reads this prop name
                                         index={index}
+                                        onDeleteCard={handleDeleteCard}
                                     />
                                 );
                             })}

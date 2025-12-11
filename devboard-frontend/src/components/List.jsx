@@ -2,7 +2,7 @@ import React from 'react';
 import { Droppable, Draggable } from 'react-beautiful-dnd';
 import Card from './Card.jsx';
 
-const List = ({ list, index, cardsById = {} }) => {
+const List = ({ list, index, cardsById = {}, onDeleteCard }) => {
     if (!list || !Array.isArray(list.cardOrder)) {
         console.error('Invalid data: list or cardOrder is not passed correctly. List:', list);
         return null;
@@ -49,7 +49,12 @@ const List = ({ list, index, cardsById = {} }) => {
                                             return <div key={`placeholder-${cardId}`} className="card-placeholder">Loading…</div>;
                                         }
 
-                                        return <Card key={String(card._id || card.id)} card={card} index={idx} />;
+                                        return <Card
+                                            key={String(card._id || card.id)}
+                                            card={card}
+                                            index={idx}
+                                            onDelete={onDeleteCard}
+                                        />;
                                     })
                                 )}
                                 {provided.placeholder}
