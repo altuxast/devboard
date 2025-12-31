@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Droppable, Draggable } from 'react-beautiful-dnd';
 import Card from './Card.jsx';
+import CardFormModal from './CardFormModal/CardFormModal.jsx';
 
-const List = ({ list, index, cardsById = {}, onDeleteCard }) => {
+const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onDeleteCard }) => {
     if (!list || !Array.isArray(list.cardOrder)) {
         console.error('Invalid data: list or cardOrder is not passed correctly. List:', list);
         return null;
@@ -13,6 +14,59 @@ const List = ({ list, index, cardsById = {}, onDeleteCard }) => {
         console.error('Missing list id for list:', list);
         return null;
     }
+
+    const [isCreating, setIsCreating] = useState(false);
+
+    // const handleCreateCard = async (data) => {
+    //     try {
+    //         const newCard = await createCard({ listId, boardId: list.boardId, ...data });
+
+    //         // Append to frontend state
+    //         setListCards((prevCards) => ({
+    //             ...prevCards,
+    //             [newCard._id]: newCard,
+    //             cardOrder: [...(list.cardOrder || []), newCard._id],
+    //         }));
+
+    //         setIsCreating(false);
+    //     } catch (err) {
+    //         console.error(err);
+    //     }
+    // };
+
+    // const handleCreateCard = async (data) => {
+    //     try {
+    //         const newCard = await createCard({
+    //             listId,
+    //             boardId: list.boardId,
+    //             ...data,
+    //         });
+
+    //         // 1️⃣ Update cards map
+    //         setListCards((prev) => ({
+    //             ...prev,
+    //             [newCard._id]: newCard,
+    //         }));
+
+    //         // 2️⃣ Update list.cardOrder (THIS IS SEPARATE STATE)
+    //         setLists((prevLists) =>
+    //             prevLists.map((l) =>
+    //                 l._id === listId
+    //                     ? { ...l, cardOrder: [...l.cardOrder, newCard._id] }
+    //                     : l
+    //             )
+    //         );
+
+    //         setIsCreating(false);
+    //     } catch (err) {
+    //         console.error(err);
+    //     }
+    // };
+
+    const handleCreateCard = async (data) => {
+        await onCreateCard(listId, data);
+        setIsCreating(false);
+    };
 
     return (
         <Draggable draggableId={String(listId)} index={index}>
@@ -53,6 +107,8 @@ const List = ({ list, index, cardsById = {}, onDeleteCard }) => {
                                             key={String(card._id || card.id)}
                                             card={card}
                                             index={idx}
+                                            list={list}
+                                            onUpdateCard={onUpdateCard}
                                             onDelete={onDeleteCard}
                                         />;
                                     })
@@ -61,6 +117,16 @@ const List = ({ list, index, cardsById = {}, onDeleteCard }) => {
                             </div>
                         )}
                     </Droppable>
+                    <button onClick={() => setIsCreating(true)}>
+                        ➕
+                    </button>
+
+                    <CardFormModal
+                        isOpen={isCreating}
+                        list={list}
+                        onClose={() => setIsCreating(false)}
+                        onSubmit={handleCreateCard}
+                    />
                 </div>
             )}
         </Draggable>

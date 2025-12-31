@@ -12,6 +12,50 @@ const Board = ({ boardId }) => {
     const [cards, setCards] = useState({});
     const [renderKey, setRenderKey] = useState(0);
 
+    const handleCreateCard = async (listId, data) => {
+        try {
+            const res = await api.post('/cards', {
+                listId,
+                boardId: board.id,
+                ...data,
+            });
+
+            const newCard = res.data;
+
+            // update cards map
+            setCards(prev => ({
+                ...prev,
+                [newCard._id]: newCard,
+            }));
+
+            // update list.cardOrder
+            setLists(prev => ({
+                ...prev,
+                [listId]: {
+                    ...prev[listId],
+                    cardOrder: [...prev[listId].cardOrder, newCard._id],
+                },
+            }));
+        } catch (err) {
+            console.error('Create card failed', err);
+        }
+    };
+
+    const handleUpdateCard = async (cardId, data) => {
+        try {
+            // const res = await api.patch(`/cards/${cardId}`, data);
+            const res = await api.put(`/cards/${cardId}`, data);
+            const updated = res.data;
+
+            setCards(prev => ({
+                ...prev,
+                [updated._id]: updated,
+            }));
+        } catch (err) {
+            console.error('Update card failed', err);
+        }
+    };
+
     useEffect(() => {
         const fetchBoard = async () => {
             try {
@@ -51,7 +95,6 @@ const Board = ({ boardId }) => {
         }));
     };
 
-    // Replace your onDragEnd with this
     const onDragEnd = async (result) => {
         const { source, destination, draggableId, type } = result;
         if (!destination) return;
@@ -258,6 +301,8 @@ const Board = ({ boardId }) => {
                                         list={listObj}
                                         cardsById={cards}   // ensure List reads this prop name
                                         index={index}
+                                        onCreateCard={handleCreateCard}
+                                        onUpdateCard={handleUpdateCard}
                                         onDeleteCard={handleDeleteCard}
                                     />
                                 );

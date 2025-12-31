@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Draggable } from 'react-beautiful-dnd';
+import CardFormModal from './CardFormModal/CardFormModal';
 
-const Card = ({ card, index, onDelete }) => {
+const Card = ({ card, index, list, onDelete, onUpdateCard }) => {
   const id = card?._id || card?.id;
   if (!id) {
     console.warn('Skipping Card render: missing id', card);
     return null;
   }
+
+  const [isEditing, setIsEditing] = useState(false);
 
   return (
     <Draggable draggableId={String(id)} index={Number(index)}>
@@ -26,21 +29,45 @@ const Card = ({ card, index, onDelete }) => {
         >
           <div
             {...provided.dragHandleProps}
-            style={{ fontWeight: '600' }}>
+            style={{ fontWeight: '600' }}
+          >
             {card.title}
           </div>
           <button
+            onClick={() => setIsEditing(true)}
+            aria-label="Edit card"
+            style={{ marginLeft: '8px' }}
+          >
+            ✏️
+          </button>
+          <button
             onClick={() => onDelete(id)}
+            aria-label="Delete card"
             style={{
               marginLeft: '8px',
               background: 'transparent',
               border: 'none',
-              color: 'c00',
+              color: '#c00',
               cursor: 'pointer',
               fontSize: '16px',
             }}>
             ❌
           </button>
+          <CardFormModal
+            isOpen={isEditing}
+            list={list}
+            initialData={card}
+            onClose={() => setIsEditing(false)}
+            onSubmit={async (data) => {
+              try {
+                // await onUpdateCard(card._id, data);
+                await onUpdateCard(id, data);
+                setIsEditing(false);
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+          />
         </div>
       )}
     </Draggable>
