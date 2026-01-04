@@ -146,12 +146,6 @@ const Board = ({ boardId }) => {
 
         // detect "drop on card" case and randomly choose before/after
         let insertIndex = destination.index;
-        if (insertIndex < newDestOrder.length) {
-            const randomChoice = Math.random() < 0.5 ? 'before' : 'after';
-            if (randomChoice === 'after') {
-                insertIndex = Math.min(insertIndex + 1, newDestOrder.length);
-            }
-        }
 
         // insert into dest at chosen index
         newDestOrder.splice(insertIndex, 0, cardId);
