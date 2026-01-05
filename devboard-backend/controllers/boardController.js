@@ -43,6 +43,22 @@ exports.getBoard = async (req, res) => {
 
         if (handleNotFound(board, res, 'Board')) return;
 
+        const boardObj = board.toObject();
+        boardObj.id = String(boardObj._id);
+
+        if (Array.isArray(boardObj.listOrder)){
+            boardObj.listOrder = boardObj.listOrder.map(list => {
+                const l = {...list, id: String(list._id)};
+                if(Array.isArray(l.cardOrder)){
+                    l.cardOrder = l.cardOrder.map(card => ({
+                        ...card,
+                        is: String(card._id)
+                    }))
+                }
+                return l;
+            })
+        }
+
         res.json(board);
     } catch (err) {
         handleServerError(res, 'Failed to get board', err);

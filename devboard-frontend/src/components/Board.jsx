@@ -6,36 +6,98 @@ import api from '../api';
 
 import List from './List.jsx';
 
+/**
+ * @typedef {Object} Board
+ * @property {string} id
+ * @property {string} title
+ * @property {string[]} listOrder
+ */
+
+/**
+ * @typedef {Object} List
+ * @property {string} id
+ * @property {string} title
+ * @property {string[]} cardOrder
+ */
+
+/**
+ * @typedef {Object} Card
+ * @property {string} id
+ * @property {string} title
+ * @property {string} description
+ * @property {string} listId
+ */
+
 const Board = ({ boardId }) => {
     const [board, setBoard] = useState({ id: '', listOrder: [] });
     const [lists, setLists] = useState({});
     const [cards, setCards] = useState({});
-    const [renderKey, setRenderKey] = useState(0);
+    const [renderKey] = useState(0);
+    const [addingList, setAddingList] = useState(false);
+    const [newListTitle, setNewListTitle] = useState('');
 
+    const fetchBoard = async () => {
+        try {
+            const res = await api.get(`/boards/${boardId}`);
+            console.log("API Response Data:", res.data); // Log the response to check structure
+            const normalized = normalizeBoard(res.data);
+            console.log("Normalized Board:", normalized); // Log the normalized data
+            setBoard(normalized.board);
+            setLists(normalized.lists);
+            setCards(normalized.cards);
+
+            console.log("Board State:", normalized.board);
+            console.log("Lists State:", normalized.lists);
+            console.log("Cards State:", normalized.cards);
+        } catch (err) {
+            console.error('Failed to fetch board:', err);
+        }
+    };
+
+    // Handle Lists
+    const handleCreateList = async (title) => {
+        try {
+            await api.post('/lists', {
+                title,
+                boardId: board.id,
+            });
+
+            await fetchBoard();
+
+        } catch (err) {
+            console.error('Create list failed', err);
+        }
+    };
+
+    const handleDeleteList = async (listId) => {
+        try {
+            await api.delete(`/lists/${listId}`);
+            await fetchBoard();   // ← canonical truth
+        } catch (err) {
+            console.error('Delete list failed', err);
+        }
+    };
+
+    const handleAddList = async () => {
+        if (!newListTitle.trim()) return;
+        const newList = await handleCreateList(newListTitle);
+        if (newList) {
+            setNewListTitle('');
+            setAddingList(false);
+        }
+    };
+
+    // Handle Cards
     const handleCreateCard = async (listId, data) => {
         try {
-            const res = await api.post('/cards', {
+            await api.post('/cards', {
                 listId,
                 boardId: board.id,
                 ...data,
             });
 
-            const newCard = res.data;
+            await fetchBoard();
 
-            // update cards map
-            setCards(prev => ({
-                ...prev,
-                [newCard._id]: newCard,
-            }));
-
-            // update list.cardOrder
-            setLists(prev => ({
-                ...prev,
-                [listId]: {
-                    ...prev[listId],
-                    cardOrder: [...prev[listId].cardOrder, newCard._id],
-                },
-            }));
         } catch (err) {
             console.error('Create card failed', err);
         }
@@ -56,226 +118,82 @@ const Board = ({ boardId }) => {
         }
     };
 
-    useEffect(() => {
-        const fetchBoard = async () => {
-            try {
-                const res = await api.get(`/boards/${boardId}`);
-                console.log("API Response Data:", res.data); // Log the response to check structure
-                const normalized = normalizeBoard(res.data);
-                console.log("Normalized Board:", normalized); // Log the normalized data
-                setBoard(normalized.board);
-                setLists(normalized.lists);
-                setCards(normalized.cards);
+    const handleDeleteCard = async (cardId) => {
+        try {
+            await api.delete(`/cards/${cardId}`);
+            await fetchBoard();
+        } catch (err) {
+            console.error("Delete card failed", err);
+        }
+    };
 
-                console.log("Board State:", normalized.board);
-                console.log("Lists State:", normalized.lists);
-                console.log("Cards State:", normalized.cards);
-            } catch (err) {
-                console.error('Failed to fetch board:', err);
-            }
-        };
+    useEffect(() => {
         fetchBoard();
     }, [boardId]);
 
-    const updateListLocally = (listId, newCardOrder) => {
-        setLists(prev => ({
-            ...prev,
-            [listId]: {
-                ...prev[listId],
-                cardOrder: newCardOrder
-            }
-        }));
-    };
-
-    const updateTwoListsLocally = (sourceId, sourceOrder, destId, destOrder) => {
-        setLists(prev => ({
-            ...prev,
-            [sourceId]: { ...prev[sourceId], cardOrder: sourceOrder },
-            [destId]: { ...prev[destId], cardOrder: destOrder }
-        }));
-    };
-
     const onDragEnd = async (result) => {
-        const { source, destination, draggableId, type } = result;
+        const { destination, source, draggableId, type } = result;
+
         if (!destination) return;
 
-        // LIST reordering unchanged
-        if (type === 'LIST') {
+        // LIST MOVE
+        if (type === "LIST") {
+            // Optimistic local update
             const newOrder = Array.from(board.listOrder);
             newOrder.splice(source.index, 1);
-            newOrder.splice(destination.index, 0, String(draggableId));
+            newOrder.splice(destination.index, 0, draggableId);
+
             setBoard(prev => ({ ...prev, listOrder: newOrder }));
+
             try {
-                await api.patch(`/boards/${board.id}/reorder-lists`, { listOrder: newOrder });
+                await api.patch(`/boards/${board.id}/move-list`, {
+                    from: source.index,
+                    to: destination.index,
+                });
+                await fetchBoard();
             } catch (err) {
-                console.error('Failed to reorder lists', err);
-                // optionally re-fetch board or rollback
+                console.error("List move failed", err);
+                await fetchBoard(); // rollback
             }
             return;
         }
 
-        // CARD dragging
-        const srcId = source.droppableId;
-        const dstId = destination.droppableId;
-        const cardId = String(draggableId);
+        // CARD MOVE
+        const sourceList = lists[source.droppableId];
+        const destList = lists[destination.droppableId];
 
-        const sourceList = lists[srcId];
-        const destList = lists[dstId];
-
-        // Defensive checks
-        if (!sourceList || !destList) {
-            console.warn('Missing source or dest list for drag', { srcId, dstId });
-            return;
-        }
-
-        // Snapshot for rollback
-        const snapshot = {
-            lists: JSON.parse(JSON.stringify(lists)),
-            cards: JSON.parse(JSON.stringify(cards))
-        };
-
-        // Optimistic local update (atomic)
-        const newSourceOrder = Array.from(sourceList.cardOrder || []);
-        let newDestOrder = Array.from(destList.cardOrder || []);
-
-        // remove from source
+        // Optimistic local update
+        const newSourceOrder = Array.from(sourceList.cardOrder);
         newSourceOrder.splice(source.index, 1);
 
-        // ensure card isn't already in dest
-        newDestOrder = newDestOrder.filter(id => id !== cardId);
+        const newDestOrder = Array.from(destList.cardOrder);
+        newDestOrder.splice(destination.index, 0, draggableId);
 
-        // detect "drop on card" case and randomly choose before/after
-        let insertIndex = destination.index;
-
-        // insert into dest at chosen index
-        newDestOrder.splice(insertIndex, 0, cardId);
-
-        // apply locally
         setLists(prev => ({
             ...prev,
-            [srcId]: { ...prev[srcId], cardOrder: newSourceOrder },
-            [dstId]: { ...prev[dstId], cardOrder: newDestOrder }
+            [source.droppableId]: { ...prev[source.droppableId], cardOrder: newSourceOrder },
+            [destination.droppableId]: { ...prev[destination.droppableId], cardOrder: newDestOrder },
         }));
 
-        // update cards state: set card.listId to dest
-        setCards(prev => {
-            if (!prev[cardId]) {
-                console.warn('Card not found in cards state during optimistic update', cardId);
-                return prev;
-            }
-            return {
-                ...prev,
-                [cardId]: { ...prev[cardId], listId: dstId }
-            };
-        });
-
-        // Prepare payload for server (post-move arrays and destIndex)
-        const payload = {
-            sourceListId: srcId,
-            destListId: dstId,
-            destIndex: destination.index,
-            sourceCardOrder: newSourceOrder,
-            destCardOrder: newDestOrder
-        };
-
         try {
-            const res = await api.patch(`/cards/${cardId}/move`, payload);
-            // Reconcile with server canonical response if provided
-            const data = res.data || {};
-            if (data.sourceList && data.destList) {
-                setLists(prev => ({
-                    ...prev,
-                    [String(data.sourceList.id || data.sourceList._id)]: {
-                        ...(prev[String(data.sourceList.id || data.sourceList._id)] || {}),
-                        cardOrder: (data.sourceList.cardOrder || []).map(String)
-                    },
-                    [String(data.destList.id || data.destList._id)]: {
-                        ...(prev[String(data.destList.id || data.destList._id)] || {}),
-                        cardOrder: (data.destList.cardOrder || []).map(String)
-                    }
-                }));
-            }
-            if (data.card) {
-                const cid = String(data.card.id || data.card._id);
-                setCards(prev => ({ ...prev, [cid]: { ...(prev[cid] || {}), ...data.card, id: cid, listId: String(data.card.listId) } }));
-            }
+            await api.patch(`/cards/${draggableId}/move`, {
+                sourceListId: source.droppableId,
+                destListId: destination.droppableId,
+                destIndex: destination.index,
+            });
+
+            await fetchBoard();
+
         } catch (err) {
-            console.error('Move API failed, rolling back', err);
-
-            // allow react-beautiful-dnd to finish internal cleanup
-            setTimeout(() => {
-                // shallow-merge snapshot to avoid replacing component identities
-                setLists(prev => {
-                    const next = { ...prev };
-                    Object.keys(snapshot.lists).forEach(id => {
-                        next[id] = { ...(next[id] || {}), cardOrder: snapshot.lists[id].cardOrder };
-                    });
-                    return next;
-                });
-
-                // cards can be replaced safely; if you prefer minimal replace, merge instead
-                setCards(prev => {
-                    const next = { ...prev };
-                    Object.keys(snapshot.cards).forEach(cid => {
-                        next[cid] = snapshot.cards[cid];
-                    });
-                    return next;
-                });
-
-                setRenderKey(k => k + 1);
-            }, 0);
+            console.error("Card move failed", err);
+            await fetchBoard();
         }
-
     };
-
-    const handleDeleteCard = async (cardId) => {
-        const token = sessionStorage.getItem("authToken");
-
-        const snapshot = {
-            lists: JSON.parse(JSON.stringify(lists)),
-            cards: JSON.parse(JSON.stringify(cards))
-        };
-
-        try {
-
-            const res = await api.delete(`/cards/${cardId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!res || res.status >= 400) {
-                console.error("Failed to delete card");
-                return;
-            }
-
-            // Local optimistic state update
-            setLists(prev => {
-                const next = { ...prev };
-                for (const listId in next) {
-                    next[listId] = {
-                        ...next[listId],
-                        cardOrder: (next[listId].cardOrder || []).filter(id => String(id) !== String(cardId))
-                    }
-                }
-                return next;
-            });
-
-            setCards(prev => {
-                const next = { ...prev };
-                delete next[cardId];
-                return next;
-            });
-
-        } catch (err) {
-            console.error("Delete card error", err);
-            setLists(snapshot.lists);
-            setCards(snapshot.cards);
-        }
-    }
 
     return (
         <DragDropContext onDragEnd={onDragEnd}>
             <div key={renderKey}>
-                <Droppable droppableId="board" direction="horizontal" type="LIST">
+                <Droppable droppableId='board' direction="horizontal" type="LIST">
                     {(provided) => (
                         <div
                             ref={provided.innerRef}
@@ -285,22 +203,70 @@ const Board = ({ boardId }) => {
 
                             {board.listOrder.map((listId, index) => {
                                 const listObj = lists[listId];
-                                if (!listObj) {
-                                    // skip rendering until lists are populated
-                                    return null;
-                                }
+                                if (!listObj) return null;
+
                                 return (
-                                    <List
-                                        key={listId}
-                                        list={listObj}
-                                        cardsById={cards}   // ensure List reads this prop name
+                                    <Draggable
+                                        key={String(listId)}
+                                        draggableId={String(listId)}
                                         index={index}
-                                        onCreateCard={handleCreateCard}
-                                        onUpdateCard={handleUpdateCard}
-                                        onDeleteCard={handleDeleteCard}
-                                    />
+                                    >
+                                        {(dragProvided) => (
+                                            <div
+                                                ref={dragProvided.innerRef}
+                                                {...dragProvided.draggableProps}
+                                                {...dragProvided.dragHandleProps}
+                                                style={{
+                                                    ...dragProvided.draggableProps.style,
+                                                    display: 'flex'
+                                                }}
+                                            >
+                                                <List
+                                                    list={listObj}
+                                                    listId={String(listId)}
+                                                    cardsById={cards}
+                                                    index={index}
+                                                    onCreateCard={handleCreateCard}
+                                                    onUpdateCard={handleUpdateCard}
+                                                    onDeleteCard={handleDeleteCard}
+                                                    onDeleteList={handleDeleteList}
+                                                />
+                                            </div>
+                                        )}
+                                    </Draggable>
                                 );
                             })}
+
+                            <div style={{ minWidth: '200px' }}>
+                                <button
+                                    onClick={() => setAddingList(true)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        border: '1px dashed #aaa',
+                                        borderRadius: '4px',
+                                        background: 'transparent',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    + Add List
+                                </button>
+
+                                {addingList && (
+                                    <div style={{ margin: '8px' }}>
+                                        <input
+                                            type='text'
+                                            value={newListTitle}
+                                            onChange={(e) => setNewListTitle(e.target.value)}
+                                            placeholder='List title...'
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleAddList();
+                                            }}
+                                        />
+                                        <button onClick={handleAddList}>Add</button>
+                                        <button onClick={() => setAddingList(false)}>Cancel</button>
+                                    </div>
+                                )}
+                            </div>
 
                             {provided.placeholder}
                         </div>
