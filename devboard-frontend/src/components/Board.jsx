@@ -69,6 +69,30 @@ const Board = ({ boardId }) => {
         }
     };
 
+    const handleUpdateList = async (listId, data) => {
+        const prev = lists;
+
+        setLists(prev => ({
+            ...prev,
+            [listId]: {
+                ...prev[listId],
+                ...data
+            }
+        }));
+
+        try {
+            const res = await api.put(`/lists/${listId}`, data);
+
+            setLists(prev => ({
+                ...prev,
+                [listId]: res.data
+            }));
+        } catch (err) {
+            console.error("Update list failed, rolling back", err);
+            setLists(prev);
+        }
+    };
+
     const handleDeleteList = async (listId) => {
         try {
             await api.delete(`/lists/${listId}`);
@@ -230,6 +254,7 @@ const Board = ({ boardId }) => {
                                                     onUpdateCard={handleUpdateCard}
                                                     onDeleteCard={handleDeleteCard}
                                                     onDeleteList={handleDeleteList}
+                                                    onUpdateList={handleUpdateList}
                                                 />
                                             </div>
                                         )}

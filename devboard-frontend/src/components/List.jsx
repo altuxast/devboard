@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Droppable } from 'react-beautiful-dnd';
 import Card from './Card.jsx';
 import CardFormModal from './CardFormModal/CardFormModal.jsx';
+import ListFormModal from './ListFormModal/ListFormModal.jsx';
 
-const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onDeleteCard, onDeleteList, dragHandleProps }) => {
+const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onUpdateList, onDeleteCard, onDeleteList, dragHandleProps }) => {
     if (!list || !Array.isArray(list.cardOrder)) {
         console.error('Invalid data: list or cardOrder is not passed correctly. List:', list);
         return null;
@@ -16,6 +17,7 @@ const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onDelet
     }
 
     const [isCreating, setIsCreating] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
 
     const handleCreateCard = async (data) => {
         await onCreateCard(listId, data);
@@ -34,6 +36,12 @@ const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onDelet
         >
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h4 {...dragHandleProps}>{list.title}</h4>
+                <button
+                    onClick={() => setIsEditing(true)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: '6px' }}
+                >
+                    ✏️
+                </button>
                 <button
                     onClick={() => onDeleteList(list.id)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer' }}
@@ -86,6 +94,16 @@ const List = ({ list, index, cardsById = {}, onCreateCard, onUpdateCard, onDelet
                 list={list}
                 onClose={() => setIsCreating(false)}
                 onSubmit={handleCreateCard}
+            />
+
+            <ListFormModal 
+                isOpen={isEditing}
+                list={list}
+                onClose={() => setIsEditing(false)}
+                onSubmit={async (data) => {
+                    await onUpdateList(listId, data);
+                    setIsEditing(false);
+                }}
             />
         </div>
     );
