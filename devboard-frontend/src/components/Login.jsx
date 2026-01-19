@@ -16,7 +16,8 @@ const Login = () => {
 
             if (token) {
                 sessionStorage.setItem('authToken', token); // Store the token in sessionStorage
-                navigate('/board'); // Use navigate to redirect after successful login
+                // navigate('/board'); // Use navigate to redirect after successful login
+                navigate('/boards'); // Use navigate to redirect after successful login
             } else {
                 setError('Login failed: No token returned');
             }

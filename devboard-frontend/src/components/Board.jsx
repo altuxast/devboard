@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import normalizeBoard from '../utils/normalizeBoard.js';
 import api from '../api';
+import { useParams } from 'react-router-dom';
 
 import List from './List.jsx';
 
@@ -28,7 +29,9 @@ import List from './List.jsx';
  * @property {string} listId
  */
 
-const Board = ({ boardId }) => {
+
+const Board = () => {
+    const { id: boardId } = useParams();
     const [board, setBoard] = useState({ id: '', listOrder: [] });
     const [lists, setLists] = useState({});
     const [cards, setCards] = useState({});

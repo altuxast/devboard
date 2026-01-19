@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Board from './components/Board';
+import BoardList from './components/BoardList';
 import Login from './components/Login';
 import './App.css';
 
@@ -11,7 +12,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} /> {/* Login page route */}
-        <Route path="/board" element={<Board boardId={boardId} />} /> {/* Board page route */}
+        <Route path="/board/:id" element={<Board boardId={boardId} />} /> {/* Board page route */}
+        <Route path="/boards" element={<BoardList />} />
         <Route path="/" element={<Login />} /> {/* Default route redirects to login */}
       </Routes>
     </Router>
